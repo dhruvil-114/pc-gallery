@@ -117,3 +117,27 @@ class CancelScanResponse(BaseModel):
     status: str
     message: str
 
+
+# -------------------------------------------------------------
+# Face Processing Schemas (Step 3)
+# -------------------------------------------------------------
+class FaceProcessRequest(BaseModel):
+    batch_size: int = Field(100, ge=1, le=1000)
+
+
+class FaceProcessStatusResponse(BaseModel):
+    is_processing: bool
+    total_unprocessed: int = 0
+    processed_count: int = 0
+    faces_detected_count: int = 0
+    people_count: int = 0
+    current_image: Optional[str] = None
+    elapsed_seconds: float = 0.0
+    recent_errors: List[str] = []
+
+
+class FaceActionResponse(BaseModel):
+    status: str
+    message: str
+
+

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db, init_db
 from app import crud, models, schemas
 from app.scanner import scanner_manager
+from app.face_engine import face_engine
 
 
 @asynccontextmanager
@@ -296,4 +297,50 @@ def cancel_scan():
         status="cancelling",
         message="Scan cancellation signal dispatched.",
     )
+
+
+# -------------------------------------------------------------
+# Facial Recognition & Clustering Endpoints (Step 3)
+# -------------------------------------------------------------
+@app.post("/api/faces/process", response_model=schemas.FaceActionResponse, tags=["Faces"])
+def trigger_face_processing(request: schemas.FaceProcessRequest = schemas.FaceProcessRequest()):
+    """Trigger background AI facial recognition worker for unprocessed photos."""
+    started = face_engine.start_processing(batch_size=request.batch_size)
+    if not started:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Face processing is already running. Check /api/faces/status.",
+        )
+    return schemas.FaceActionResponse(
+        status="started",
+        message="AI facial recognition background worker started.",
+    )
+
+
+@app.get("/api/faces/status", response_model=schemas.FaceProcessStatusResponse, tags=["Faces"])
+def get_face_processing_status():
+    """Get live progress and statistics for AI facial recognition."""
+    return face_engine.get_status()
+
+
+@app.post("/api/faces/cancel", response_model=schemas.FaceActionResponse, tags=["Faces"])
+def cancel_face_processing():
+    """Cancel currently running AI facial recognition job."""
+    cancelled = face_engine.cancel_processing()
+    if not cancelled:
+        return schemas.FaceActionResponse(
+            status="idle",
+            message="No facial processing job is currently running.",
+        )
+    return schemas.FaceActionResponse(
+        status="cancelling",
+        message="Face processing cancellation signal dispatched.",
+    )
+
+
+@app.get("/api/images/{image_id}/faces", response_model=List[schemas.FaceMapOut], tags=["Faces"])
+def get_image_face_tags(image_id: int, db: Session = Depends(get_db)):
+    """Retrieve all detected face bounding boxes and recognized people for a photo."""
+    return crud.get_faces_for_image(db=db, image_id=image_id)
+
 
