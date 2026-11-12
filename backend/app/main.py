@@ -6,9 +6,10 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from app.database import get_db, init_db
+from app.database import get_db, init_db, BASE_DIR
 from app import crud, models, schemas
 from app.scanner import scanner_manager
 from app.face_engine import face_engine
@@ -342,5 +343,14 @@ def cancel_face_processing():
 def get_image_face_tags(image_id: int, db: Session = Depends(get_db)):
     """Retrieve all detected face bounding boxes and recognized people for a photo."""
     return crud.get_faces_for_image(db=db, image_id=image_id)
+
+
+# -------------------------------------------------------------
+# Static Frontend Serving (Unified desktop application)
+# -------------------------------------------------------------
+FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
+if FRONTEND_DIST.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
+
 
 
