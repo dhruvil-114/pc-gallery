@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db, init_db
 from app import crud, models, schemas
+from app.scanner import scanner_manager
 
 
 @asynccontextmanager
@@ -247,11 +248,11 @@ def update_person(
 
 
 # -------------------------------------------------------------
-# Scanner Endpoint (Foundation for Step 2)
+# Scanner Endpoints (Step 2: Non-blocking Multithreaded Engine)
 # -------------------------------------------------------------
 @app.post("/api/scan", response_model=schemas.ScanResponse, tags=["Scanner"])
 def trigger_scan(request: schemas.ScanRequest):
-    """Trigger local directory scan (Full implementation in Step 2)."""
+    """Trigger background directory scan and thumbnail generation."""
     target = Path(request.folder_path)
     if not target.exists() or not target.is_dir():
         raise HTTPException(
@@ -259,8 +260,40 @@ def trigger_scan(request: schemas.ScanRequest):
             detail=f"Provided directory does not exist or is not a folder: {request.folder_path}",
         )
 
+    started = scanner_manager.start_scan(
+        folder_path=str(target.resolve()),
+        force_rescan=request.force_rescan,
+    )
+    if not started:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A scan job is already actively running. Check /api/scan/status.",
+        )
+
     return schemas.ScanResponse(
-        status="accepted",
-        message=f"Directory '{request.folder_path}' accepted for scanning.",
+        status="started",
+        message=f"Scan started for directory '{request.folder_path}'.",
         folder_path=str(target.resolve()),
     )
+
+
+@app.get("/api/scan/status", response_model=schemas.ScanStatusResponse, tags=["Scanner"])
+def get_scan_status():
+    """Get live progress and statistics for the background scanner."""
+    return scanner_manager.get_status()
+
+
+@app.post("/api/scan/cancel", response_model=schemas.CancelScanResponse, tags=["Scanner"])
+def cancel_scan():
+    """Cancel currently running scan job."""
+    cancelled = scanner_manager.cancel_scan()
+    if not cancelled:
+        return schemas.CancelScanResponse(
+            status="idle",
+            message="No scan is currently running.",
+        )
+    return schemas.CancelScanResponse(
+        status="cancelling",
+        message="Scan cancellation signal dispatched.",
+    )
+

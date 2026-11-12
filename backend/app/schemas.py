@@ -98,3 +98,22 @@ class ScanResponse(BaseModel):
     status: str
     message: str
     folder_path: str
+
+
+class ScanStatusResponse(BaseModel):
+    is_scanning: bool
+    folder_path: Optional[str] = None
+    total_files: int = 0
+    processed_files: int = 0
+    indexed_count: int = 0
+    skipped_count: int = 0
+    error_count: int = 0
+    current_file: Optional[str] = None
+    elapsed_seconds: float = 0.0
+    recent_errors: List[str] = []
+
+
+class CancelScanResponse(BaseModel):
+    status: str
+    message: str
+
